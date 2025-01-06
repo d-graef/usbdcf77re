@@ -1,0 +1,62 @@
+
+
+Installation instrucions for usbdcf77re
+
+The precompiled binary is for x86-64 Linux.
+
+
+Manually for Linux Distributions with systemd
+
+1. Copy the binary usbdcf77re to /usr/bin
+
+2. Install the libusb binary (On Fedora: "dnf install libusb")
+
+3. Copy the unit service file "usbdcf77re.service" to /usr/lib/systemd/system/
+
+4. execute "systemctl daemon-reload" 
+
+5. Configure chrony (or ntpd) with the SHM driver. See file chrony.conf in this archive.
+
+6. Start the daemon: "systemctl start usbdcf77re.service"
+
+
+Please note, you have to configure the same SHM (e. g. SHM ID 1) in chrony and usbdcf77re.
+No other device (like a GPS receiver) must use the same SHM ID.
+
+
+Manually for Linux Distributions with SysV init like https://www.devuan.org/
+
+1. Copy the binary usbdcf77re to /usr/bin
+
+2. Install the libusb binary
+
+3. Create a start script in the directory /etc/init.d/ e. g. with the name usbdcf77re
+See other start/stop scripts in the directory /etc/init.d/ how to create such a script.
+
+4. Configure chrony (or ntpd) with the SHM driver. See file chrony.conf in this archive.
+
+5. Start the daemon: "/etc/init.d/usbdcf77re start"
+
+6. Create softlinks in the appropriate run-level directories for starting/stopping the daemon.
+Example for ntpsec: ntpS03ntpsec -> ../init.d/ntpsec
+
+
+Installation with rpm package:
+
+
+There is a rpm package for Fedora Linux: usbdcf77re-0.1.0-1.fc41.x86_64.rpm
+Maybe it work on other rpm based distributions too.
+
+Please install libusb library before installing the package with "rpm -i <rpm-file>"
+
+
+
+The daemon writes a logfile to /var/log/usbdcf77re.log
+
+A PID file is written to /var/run/usbdcf77re.pid conatining the PID.
+
+
+Please keep in mind this the initial release, the software was tested only on Fedora Linux (x86-64) with chrony 4.6.1.
+
+
+

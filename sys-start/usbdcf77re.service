@@ -1,0 +1,11 @@
+[Unit]
+Description=USBDCF77RE service daemon
+
+[Service]
+Type=idle
+PIDFile=/var/run/usbdcf77re.pid
+ExecStart=/usr/bin/usbdcf77re -d 1
+
+[Install]
+WantedBy=multi-user.target
+

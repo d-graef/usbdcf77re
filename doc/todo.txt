@@ -1,0 +1,11 @@
+
+ToDos:
+
+- Testing / Bugfixing
+- General improvements
+
+- compile for other OS where libusb and ntpd is available
+- create DEB package
+- create manpage
+
+
