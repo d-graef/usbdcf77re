@@ -22,7 +22,11 @@ short log_flag = 0;
 #include <stdlib.h>
 
 #include <unistd.h>
+#if __FreeBSD__
+#include <libusb.h>
+#else
 #include <libusb-1.0/libusb.h>
+#endif
 #include <assert.h>
 #include <time.h>
 #include <sys/shm.h>
@@ -56,7 +60,7 @@ int main(int argc, char **argv) {
 	pid_t usbdcf77re_pid = 0;
 	char tz_string[] = "nnnn";				// timezone string max. 4 char
 	int tz_offset = 0;						// in seconds
-	const char usbcdf77re_version[] = "0.1.0";
+	const char usbcdf77re_version[] = "0.1.1";
 
 	t_usbdcf77re_stats usbdcf77re_stats;
 

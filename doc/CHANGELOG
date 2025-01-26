@@ -1,6 +1,9 @@
 
 Changelog usbdcf77re
 
+* Ver. 0.1.1
+- 26.01.2025
+- Minor change to compile on FreeBSD 14.2
 
 * Ver. 0.1.0
 - 21.12.2024

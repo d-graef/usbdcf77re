@@ -1,0 +1,10 @@
+CC = cc
+BINARY = usbdcf77re
+
+all:
+	$(CC) -O2 -Wall -Wextra usbdfc77re.c -lusb -o $(BINARY)
+
+clean:
+	rm -f $(BINARY)
+
+
