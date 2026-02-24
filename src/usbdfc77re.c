@@ -59,8 +59,9 @@ int main(int argc, char **argv) {
 	shmTime *p_shmtime_dcf77 = NULL;
 	pid_t usbdcf77re_pid = 0;
 	char tz_string[] = "nnnn";				// timezone string max. 4 char
-	int tz_offset = 0;						// in seconds
-	const char usbcdf77re_version[] = "0.1.1";
+	int tz_offset = 0;					// in seconds
+	const char usbcdf77re_version[] = "0.1.2";
+	char time_string[80] = "init-string-timestamp-logging";
 
 	t_usbdcf77re_stats usbdcf77re_stats;
 
@@ -72,6 +73,7 @@ int main(int argc, char **argv) {
 	char *shm_id_s = NULL;
 	int c = 0;
 	int w_count = 0;
+	int rc = -1;
 	FILE *dcf77_logfile_handle = NULL;
 	FILE *dcf77_pid_file_handle = NULL;
 
@@ -122,7 +124,7 @@ int main(int argc, char **argv) {
 		}	// while getopt
 
 
-	if ((log_flag == 1) & (shm_id ==99)) {		// -d option not set
+	if ((log_flag == 1) & (shm_id == 99)) {		// -d option not set
 		usage(usbcdf77re_version);
 		return 0;
 	}
@@ -130,7 +132,7 @@ int main(int argc, char **argv) {
 	if (show_info == 1) {
 		show_dev_info();
 		return 0;
-	} else if (show_time ==1) {
+	} else if (show_time == 1) {
 		show_dev_time(&dcf77_time, &dcf77_status_bits);
 		return 0;
 	}	//	else continue in daemon mode
@@ -138,22 +140,28 @@ int main(int argc, char **argv) {
 	signal(SIGINT, handle_sigint);				// register signal handler
 	signal(SIGTERM, handle_sigterm);			// register signal handler
 
+	get_timestamp_string(time_string);
 	dcf77_logfile_handle = fopen("/var/log/usbdcf77re.log", "a");	// open logfile
-	fprintf(dcf77_logfile_handle, "=== starting ===\n");
+	fprintf(dcf77_logfile_handle, "%s === starting ===\n", time_string);
+	fprintf(dcf77_logfile_handle, "usbcdf77re version: %s\n", usbcdf77re_version);
 	fflush(dcf77_logfile_handle);
-
-	libusb_context *plc;
-	if (libusb_init(&plc) != LIBUSB_SUCCESS) {
-		fprintf(dcf77_logfile_handle, "Error, could not initialize libusb\n");
-		return -1;
-	}
-	libusb_device_handle *pldh = libusb_open_device_with_vid_pid(plc, VID, PID);
 
 	// check if PID file exists
 	if (check_pid_file()) {
 		printf("Please check if usbdcf77re is already running and check the PID file /var/run/usbdcf77re.pid\n");
-		return 3;
+		fprintf(dcf77_logfile_handle, "Please check if usbdcf77re is already running and check the PID file /var/run/usbdcf77re.pid\n");
+		return 6;
 	}
+
+	libusb_context *plc;
+	plc = NULL;
+	if (libusb_init(&plc) != LIBUSB_SUCCESS) {
+		fprintf(dcf77_logfile_handle, "Error, could not initialize libusb\n");
+		return 1;
+	}
+	libusb_device_handle *pldh;
+	pldh = NULL;
+	pldh = libusb_open_device_with_vid_pid(plc, VID, PID);
 
 	daemon(0,0);						// run in background
 	
@@ -171,9 +179,9 @@ int main(int argc, char **argv) {
 		fprintf(dcf77_logfile_handle, "Successfully opened USB device USBDCF77RE\n");
 		fflush(dcf77_logfile_handle);
 
-		if ((init_ntp_shm(&p_shmtime_dcf77, shm_id)) == -1) {
-			fprintf(dcf77_logfile_handle, "Error: attaching to SHM");		// write timezone to logfile;
-			return -1;
+		if ((init_ntp_shm(&p_shmtime_dcf77, shm_id)) == -1) {			// attach to SHM
+			fprintf(dcf77_logfile_handle, "Error: attaching to SHM");
+			return 4;
 		}
 		
 		detailed_dcf77_status = get_dcf77_status(pldh);			// return: 0, 1, 2, 3. red, yellow, green.
@@ -189,13 +197,22 @@ int main(int argc, char **argv) {
 					usleep(2000000);			// check exit flag every 2 sec. wait 62 seconds (31 * 2 sec.)
 					if (exit_flag != 0) {
 						shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
+						shmdt(p_shmtime_dcf77);				// detach from SHM
+						libusb_exit(plc);
 						return 0;
 					}
 				}
 			}	// if
 
 		// query time from device right after switch of second
-		get_dcf77_current_time(pldh, &dcf77_time, &dcf77_status_bits);
+		rc = get_dcf77_current_time(pldh, &dcf77_time, &dcf77_status_bits);
+		if (rc != 0) {
+			fprintf(dcf77_logfile_handle, "Error getting current time from device. Shutting down.\n");
+			shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
+			shmdt(p_shmtime_dcf77);				// detach from SHM
+			libusb_exit(plc);
+			return 2;
+		}
 
 		detailed_dcf77_status = get_dcf77_status(pldh);			// return: 0, 1, 2, 3. red yellow, green.
 
@@ -208,6 +225,7 @@ int main(int argc, char **argv) {
 			if (exit_flag != 0) {
 				shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
 				shmdt(p_shmtime_dcf77);				// detach from SHM
+				libusb_exit(plc);
 				return 0;
 			}
 		}
@@ -218,10 +236,18 @@ int main(int argc, char **argv) {
 
 	} else {
 		fprintf(dcf77_logfile_handle, "Error: No device connected, or not enough permissions.\n");
-		exitCode = -1;
+		exitCode = 5;
 	}
 
 	libusb_exit(plc);
+	fprintf(dcf77_logfile_handle, "Cound't USB device USBDCF77RE\n");
+	get_timestamp_string(time_string);
+	fprintf(dcf77_logfile_handle, "%s === end ===\n", time_string);
+	fflush(dcf77_logfile_handle);
+	fclose(dcf77_logfile_handle);				// close file
+	fclose(dcf77_pid_file_handle);
+	remove("/var/run/usbdcf77re.pid");
+
 	return exitCode;
 
 }		// end main()

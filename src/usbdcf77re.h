@@ -381,9 +381,9 @@ int detect_sec_change_loop (const int delay, libusb_device_handle *pdcf77_l, int
 }
 
 
-/* ----------------------------------------------------------------------
+/* ----------------------------------------------------------------------------------------------------------
 		try to get change of second with few requests (avoid requests every 5 ms for one second)
----------------------------------------------------------------------- */
+----------------------------------------------------------------------------------------------------------- */
 
 int get_time_change(libusb_device_handle *pdcf77_rtc, FILE *logfile_handle, int detailed_dcf77_status_f)
 {
@@ -396,7 +396,7 @@ int get_time_change(libusb_device_handle *pdcf77_rtc, FILE *logfile_handle, int 
 
 	if (detailed_dcf77_status_f == 3) {
 		m = detect_rtc_time_change_loop(poll_200ms, pdcf77_rtc, logfile_handle);
-		if (log_flag ==1) {
+		if (log_flag == 1) {
 			fprintf(logfile_handle, "clock %i us loop count: %i ", poll_200ms, m);
 		}
 		usleep(700000);					// 1000 - 800 - 2 * 50 ms
@@ -610,7 +610,7 @@ int show_dev_info()
 
 int bcd_decimal(uint8_t hex)
 {
-	assert(((hex & 0xF0) >> 4) < 10);		// More significant nybble is valid
+	assert(((hex & 0xF0) >> 4) < 10);			// More significant nybble is valid
 	assert((hex & 0x0F) < 10);				// Less significant nybble is valid
 	int dec = ((hex & 0xF0) >> 4) * 10 + (hex & 0x0F);
 	return dec;
@@ -635,6 +635,29 @@ int check_pid_file()
 }
 
 /* ----------------------------------------------------------------------
+		return current time/date as string for logging
+---------------------------------------------------------------------- */
+
+int get_timestamp_string(char *buffer)
+{
+
+	struct timespec ts;
+	time_t log_timestamp = 0;
+	struct tm *t2;
+
+
+//	convert UNIX time to human readable
+	clock_gettime(CLOCK_REALTIME, &ts);			// returns current time in UNIX time
+	log_timestamp = ts.tv_sec;
+	t2 = localtime(&log_timestamp);
+
+	strftime(buffer, 80, "%b %d %H:%M:%S %Y", t2);
+
+	return 0;
+}
+
+
+/* ----------------------------------------------------------------------
 		close logfile and handle to device
 ---------------------------------------------------------------------- */
 
@@ -645,7 +668,6 @@ int shutdown(libusb_device_handle *pldh, FILE* dcf77_logfile_handle, FILE* dcf77
 	fprintf(dcf77_logfile_handle, "Closing USB device USBDCF77RE\n");
 
 	libusb_close(pldh);					// close USB device handle
-
 	fprintf(dcf77_logfile_handle, "=== end ===\n");
 	fflush(dcf77_logfile_handle);
 	fclose(dcf77_logfile_handle);				// close file
