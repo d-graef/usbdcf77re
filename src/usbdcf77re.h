@@ -391,7 +391,7 @@ int get_time_change(libusb_device_handle *pdcf77_rtc, FILE *logfile_handle, int 
 	int exitCode = 0;
 	const int poll_200ms = 200000;		// in us
 	const int poll_50ms = 50000;		// in us
-	const int poll_5ms = 5000;		// in us
+	const int poll_5ms = 5000;			// in us
 	int m = 0;
 
 	if (detailed_dcf77_status_f == 3) {
@@ -399,27 +399,42 @@ int get_time_change(libusb_device_handle *pdcf77_rtc, FILE *logfile_handle, int 
 		if (log_flag == 1) {
 			fprintf(logfile_handle, "clock %i us loop count: %i ", poll_200ms, m);
 		}
+			if (m == -1) {
+				exitCode = -1;
+				return exitCode;
+			}
 		usleep(700000);					// 1000 - 800 - 2 * 50 ms
 
 		m = 0;
 		m = detect_rtc_time_change_loop(poll_50ms, pdcf77_rtc, logfile_handle);
-		
-		if (log_flag ==1) {
+			if (m == -1) {
+			exitCode = -1;
+			return exitCode;
+			}
+
+		if (log_flag == 1) {
 			fprintf(logfile_handle, "clock %i us loop count: %i ", poll_50ms, m);
 		}
+			if (m == -1) {
+				exitCode = -1;
+				return exitCode;
+			}
 		usleep(880000);					// 900 ms is sometimes to long
 
 		m = 0;
 		m = detect_rtc_time_change_loop(poll_5ms, pdcf77_rtc, logfile_handle);
-		
-		if (log_flag ==1) {
+		if (m == -1) {
+			exitCode = -1;
+			return exitCode;
+		}
+
+		if (log_flag == 1) {
 			fprintf(logfile_handle, "clock %i us loop count: %i\n", poll_5ms, m);
 		}
 
 		}
 
 //		continue (return) if dcf status != 3
-		
 		return exitCode;
 
 }

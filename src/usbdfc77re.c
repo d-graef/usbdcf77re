@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
 	pid_t usbdcf77re_pid = 0;
 	char tz_string[] = "nnnn";				// timezone string max. 4 char
 	int tz_offset = 0;					// in seconds
-	const char usbcdf77re_version[] = "0.1.2";
+	const char usbcdf77re_version[] = "0.1.3";
 	char time_string[80] = "init-string-timestamp-logging";
 
 	t_usbdcf77re_stats usbdcf77re_stats;
@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
 	pldh = libusb_open_device_with_vid_pid(plc, VID, PID);
 
 	daemon(0,0);						// run in background
-	
+
 	usbdcf77re_pid = getpid();
 	dcf77_pid_file_handle = fopen("/var/run/usbdcf77re.pid", "w");		// write PID file
 	fprintf(dcf77_pid_file_handle, "%i\n", usbdcf77re_pid);
@@ -183,18 +183,24 @@ int main(int argc, char **argv) {
 			fprintf(dcf77_logfile_handle, "Error: attaching to SHM");
 			return 4;
 		}
-		
+
 		detailed_dcf77_status = get_dcf77_status(pldh);			// return: 0, 1, 2, 3. red, yellow, green.
 		usleep(80000);
 
 		while (exit_flag == 0) {					// ========= main loop =========
 
-			get_time_change(pldh, dcf77_logfile_handle, detailed_dcf77_status);		// always query via "USB_GET_TIMEDATA" USB command
-
+			rc = get_time_change(pldh, dcf77_logfile_handle, detailed_dcf77_status);		// always query via "USB_GET_TIMEDATA" USB command
+		if (rc != 0) {
+			fprintf(dcf77_logfile_handle, "Error getting current time from device (get_time_change). Shutting down.\n");
+			shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
+			shmdt(p_shmtime_dcf77);				// detach from SHM
+			libusb_exit(plc);
+			return 3;
+		}
 			if (detailed_dcf77_status != 3) {
 
 				for (w_count = 1; w_count <= 31; w_count++) {
-					usleep(2000000);			// check exit flag every 2 sec. wait 62 seconds (31 * 2 sec.)
+					usleep(2000000);						// check exit flag every 2 sec. wait 62 seconds (31 * 2 sec.)
 					if (exit_flag != 0) {
 						shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
 						shmdt(p_shmtime_dcf77);				// detach from SHM
@@ -207,7 +213,7 @@ int main(int argc, char **argv) {
 		// query time from device right after switch of second
 		rc = get_dcf77_current_time(pldh, &dcf77_time, &dcf77_status_bits);
 		if (rc != 0) {
-			fprintf(dcf77_logfile_handle, "Error getting current time from device. Shutting down.\n");
+			fprintf(dcf77_logfile_handle, "Error getting current time from device (get_dcf77_current_time). Shutting down.\n");
 			shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
 			shmdt(p_shmtime_dcf77);				// detach from SHM
 			libusb_exit(plc);
