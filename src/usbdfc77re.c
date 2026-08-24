@@ -32,9 +32,9 @@ short log_flag = 0;
 #include <sys/shm.h>
 #include <signal.h>
 
-#define VID 0x16C0		// USB vendor ID
-#define PID 0x27EA		// USB product ID
-#define SNLEN 8			// Lenght of USB serial number
+#define VID 0x16C0			// USB vendor ID
+#define PID 0x27EA			// USB product ID
+#define SNLEN 8				// Lenght of USB serial number
 #define CONTROLBYTES 8
 #define USB_TIMEOUT 500		//in ms
 
@@ -59,14 +59,14 @@ int main(int argc, char **argv) {
 	shmTime *p_shmtime_dcf77 = NULL;
 	pid_t usbdcf77re_pid = 0;
 	char tz_string[] = "nnnn";				// timezone string max. 4 char
-	int tz_offset = 0;					// in seconds
+	int tz_dcf77_offset = 0;				// in hours
 	const char usbcdf77re_version[] = "0.1.3";
 	char time_string[80] = "init-string-timestamp-logging";
 
 	t_usbdcf77re_stats usbdcf77re_stats;
 
 	int shm_id = 99;
-	int exitCode = 0;	
+	int exitCode = 0;
 
 	short show_info = 0;
 	short show_time = 0;
@@ -171,8 +171,8 @@ int main(int argc, char **argv) {
 	fflush(dcf77_pid_file_handle);
 	
 	get_tz_string(tz_string);
-	fprintf(dcf77_logfile_handle, "timezone: %s\n", tz_string);		// write timezone to logfile
-	tz_offset = calc_tz_offset(tz_string);
+	tz_dcf77_offset = calc_tz_offset(tz_string);
+	fprintf(dcf77_logfile_handle, "timezone: %s; DCF77 offset: %i\n", tz_string, tz_dcf77_offset);		// write timezone to logfile
 
 	if (pldh) {
 
@@ -189,19 +189,12 @@ int main(int argc, char **argv) {
 
 		while (exit_flag == 0) {					// ========= main loop =========
 
-			rc = get_time_change(pldh, dcf77_logfile_handle, detailed_dcf77_status);		// always query via "USB_GET_TIMEDATA" USB command
-		if (rc != 0) {
-			fprintf(dcf77_logfile_handle, "Error getting current time from device (get_time_change). Shutting down.\n");
-			shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
-			shmdt(p_shmtime_dcf77);				// detach from SHM
-			libusb_exit(plc);
-			return 3;
-		}
 			if (detailed_dcf77_status != 3) {
-
 				for (w_count = 1; w_count <= 31; w_count++) {
 					usleep(2000000);						// check exit flag every 2 sec. wait 62 seconds (31 * 2 sec.)
 					if (exit_flag != 0) {
+						get_timestamp_string(time_string);
+						fprintf(dcf77_logfile_handle, "%s Caught signal %d shutting down\n", time_string, exit_flag);
 						shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
 						shmdt(p_shmtime_dcf77);				// detach from SHM
 						libusb_exit(plc);
@@ -210,31 +203,45 @@ int main(int argc, char **argv) {
 				}
 			}	// if
 
-		// query time from device right after switch of second
-		rc = get_dcf77_current_time(pldh, &dcf77_time, &dcf77_status_bits);
-		if (rc != 0) {
-			fprintf(dcf77_logfile_handle, "Error getting current time from device (get_dcf77_current_time). Shutting down.\n");
-			shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
-			shmdt(p_shmtime_dcf77);				// detach from SHM
-			libusb_exit(plc);
-			return 2;
-		}
-
-		detailed_dcf77_status = get_dcf77_status(pldh);			// return: 0, 1, 2, 3. red yellow, green.
-
-		// write time immediately to shared memory
-		write_time_ntp_shm(p_shmtime_dcf77, &dcf77_time, &dcf77_status_bits, detailed_dcf77_status, dcf77_logfile_handle, tz_offset,
-						&usbdcf77re_stats);
-		
-		for (w_count = 1; w_count <= 7; w_count++) {
-			usleep(2000000);			// check exit flag every 2 sec. wait 14 seconds (7 * 2 sec.)
-			if (exit_flag != 0) {
+			// get switch of second
+			rc = get_time_change(pldh, dcf77_logfile_handle, detailed_dcf77_status);		// always query via "USB_GET_TIMEDATA" USB command
+			if (rc != 0) {
+				get_timestamp_string(time_string);
+				fprintf(dcf77_logfile_handle, "%s Error getting current time from device (get_time_change). Shutting down.\n", time_string);
 				shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
 				shmdt(p_shmtime_dcf77);				// detach from SHM
 				libusb_exit(plc);
-				return 0;
+				return 3;
 			}
-		}
+
+			// query time from device right after switch of second
+			rc = get_dcf77_current_time(pldh, &dcf77_time, &dcf77_status_bits);
+			if (rc != 0) {
+				get_timestamp_string(time_string);
+				fprintf(dcf77_logfile_handle, "%s Error getting current time from device (get_dcf77_current_time). Shutting down.\n", time_string);
+				shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
+				shmdt(p_shmtime_dcf77);				// detach from SHM
+				libusb_exit(plc);
+				return 2;
+			}
+
+			detailed_dcf77_status = get_dcf77_status(pldh);			// return: 0, 1, 2, 3. red, yellow, green.
+
+			// write time immediately to shared memory
+			write_time_ntp_shm(p_shmtime_dcf77, &dcf77_time, &dcf77_status_bits, detailed_dcf77_status, dcf77_logfile_handle, tz_dcf77_offset,
+						&usbdcf77re_stats);
+
+			for (w_count = 1; w_count <= 7; w_count++) {
+			usleep(2000000);			// check exit flag every 2 sec. wait 14 seconds (7 * 2 sec.)
+				if (exit_flag != 0) {
+					get_timestamp_string(time_string);
+					fprintf(dcf77_logfile_handle, "%s Caught signal %d shutting down\n",time_string , exit_flag);
+					shutdown(pldh, dcf77_logfile_handle, dcf77_pid_file_handle);
+					shmdt(p_shmtime_dcf77);				// detach from SHM
+					libusb_exit(plc);
+					return 0;
+				}
+			}
 		detailed_dcf77_status = get_dcf77_status(pldh);				// get current status short before next loop
 
 		}		// main while loop
@@ -246,7 +253,7 @@ int main(int argc, char **argv) {
 	}
 
 	libusb_exit(plc);
-	fprintf(dcf77_logfile_handle, "Cound't USB device USBDCF77RE\n");
+	fprintf(dcf77_logfile_handle, "Cound't open USB device USBDCF77RE\n");
 	get_timestamp_string(time_string);
 	fprintf(dcf77_logfile_handle, "%s === end ===\n", time_string);
 	fflush(dcf77_logfile_handle);
@@ -257,5 +264,4 @@ int main(int argc, char **argv) {
 	return exitCode;
 
 }		// end main()
-
 

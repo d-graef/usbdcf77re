@@ -45,6 +45,7 @@ int write_time_ntp_shm(shmTime *p_shmtime_dcf77_u, t_dcf77_time_data *dcf77_time
 	struct tm *t2;
 	time_t t_of_day;
 	int clock_diff = 0;
+	unsigned int unix_time = 0;
 	unsigned int clock_diff_abs = 0;
 	unsigned int stats_counter = 0;
 	struct timespec ts;
@@ -56,24 +57,30 @@ int write_time_ntp_shm(shmTime *p_shmtime_dcf77_u, t_dcf77_time_data *dcf77_time
 		t.tm_year = dcf77_time_s->year - 1900;				// Year - 1900
 		t.tm_mon = dcf77_time_s->month - 1;					// Month, where 0 = jan
 		t.tm_mday = dcf77_time_s->day;						// Day of the month
-		t.tm_hour = dcf77_time_s->hour + tz_offset_shm;		// input is local time e. g. CET, CEST, CET, CEST, WET, WEST. DCF77 = CET or CEST
+//		t.tm_hour = dcf77_time_s->hour + tz_offset_shm;		// adding offset for timezones not CET/CEST (DCF77 time)
+		t.tm_hour = dcf77_time_s->hour;						// passing current DCF77 hour (CET / CEST); returns current UNIX time UTC
+// mktime() uses tzname for detecting timezone. tzset() initializes the tzname variable from the TZ enviroment variable.
+// If the TZ variable appears in the enviroment but its value is empty or its value cannot be correctly interpreted, UTC is used.
+// https://stackoverflow.com/questions/530519/stdmktime-and-timezone-info
+
 		t.tm_min = dcf77_time_s->minute;
 		t.tm_sec = dcf77_time_s->second;
 		t.tm_isdst = -1;							// Is DST on? 1 = yes, 0 = no, -1 = unknown
-		t_of_day = mktime(&t);						// convert DCF77 values to UNIX time
-		clock_gettime(CLOCK_REALTIME, &timestamp);	// get current system time
-		clock_diff = t_of_day - timestamp.tv_sec;	// diff of seconds
+		t_of_day = mktime(&t);						// convert DCF77 (CET/CEST) values to UNIX time UTC
+		clock_gettime(CLOCK_REALTIME, &timestamp);	// get current UTC system time from OS
+		unix_time = timestamp.tv_sec + tz_offset_shm;		// adding offset to DCF77 (CET/CEST) in seconds (for timezones exept CET/CEST)
+		clock_diff = t_of_day - unix_time;			// diff of seconds
 		clock_diff_abs = abs(clock_diff);
 
 //		write values to SHM
 
-			if (dcf77_status == 3) {
-				p_shmtime_dcf77_u->clockTimeStampUSec = 56000;		// when source DCF 56 ms
-				p_shmtime_dcf77_u->precision = -8;					// 2^(-8) = 0.0039 seconds
-			} else {
-				p_shmtime_dcf77_u->clockTimeStampUSec = 160000;		// when source RTC 60 ms + 100 ms loop delay meantime
-				p_shmtime_dcf77_u->precision = -3;					// 2^(-3) = 0.125 seconds
-			}
+		if (dcf77_status == 3) {
+			p_shmtime_dcf77_u->clockTimeStampUSec = 56000;		// when source DCF 56 ms
+			p_shmtime_dcf77_u->precision = -8;					// 2^(-8) = 0.0039 seconds
+		} else {
+			p_shmtime_dcf77_u->clockTimeStampUSec = 160000;		// when source RTC 60 ms + 100 ms loop delay meantime
+			p_shmtime_dcf77_u->precision = -3;					// 2^(-3) = 0.125 seconds
+		}
 
 		p_shmtime_dcf77_u->mode = 0;
 		p_shmtime_dcf77_u->count = 0;
@@ -117,12 +124,12 @@ int write_time_ntp_shm(shmTime *p_shmtime_dcf77_u, t_dcf77_time_data *dcf77_time
 				fprintf(logfile_handle, "%s diff sys-time (%li) / device (%li) %i second(s) (check receiving state)\n", buffer, timestamp.tv_sec, t_of_day, clock_diff);
 			}
 
-			if (log_flag ==1) {
+			if (log_flag == 1) {
 				fprintf(logfile_handle, "%s dcf77: %02d:%02d:%02d  dcf-status: %i t-source: %i valid: %i summertime: %i dcf77-detail: %i \
- offset us: %li clock-diff: %i\n",
+ offset us: %li clock-diff: %i shm-offset: %i\n",
 				buffer, dcf77_time_s->hour, dcf77_time_s->minute, dcf77_time_s->second, dcf77_status_bits_s->DCFStatus,
 				dcf77_status_bits_s->timesource, dcf77_status_bits_s->valid, dcf77_status_bits_s->summertime, dcf77_status, timestamp.tv_nsec,
-				clock_diff);
+				clock_diff, tz_offset_shm);
 			}
 
 		fflush(logfile_handle);
@@ -137,6 +144,4 @@ int write_time_ntp_shm(shmTime *p_shmtime_dcf77_u, t_dcf77_time_data *dcf77_time
 	return 0;
 
 }
-
-
 

@@ -27,7 +27,7 @@ void usage(const char *usbdcf77re_version)
 {
 
 	printf("\tusbdcf77re version: %s", usbdcf77re_version);
-	printf("\t (c) 2024 by Detlef Graef & Reusch Elektronik\n");
+	printf("\t (c) 2024 - 2026 by Detlef Graef & Reusch Elektronik\n");
 	printf("\t-h help\n");
 	printf("\t-v print version\n");
 	printf("\t-d <shmid> run as daemon; write data to SHM for ntpd, ntpsec, chrony\n");
@@ -679,7 +679,6 @@ int get_timestamp_string(char *buffer)
 int shutdown(libusb_device_handle *pldh, FILE* dcf77_logfile_handle, FILE* dcf77_pid_file_handle)
 {
 
-	fprintf(dcf77_logfile_handle, "Caught signal %d shutting down\n", exit_flag);
 	fprintf(dcf77_logfile_handle, "Closing USB device USBDCF77RE\n");
 
 	libusb_close(pldh);					// close USB device handle
