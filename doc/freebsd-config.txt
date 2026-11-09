@@ -1,0 +1,38 @@
+
+Example configuration for FreeBSD:
+
+Add the following lines to the file /etc/ntp.conf:
+
+# usbdcf77re (SHM driver)
+server 127.127.28.2
+
+
+Then restart ntpd, check if the SHM is there:
+command: "ipcs -m"
+
+Output:
+
+Shared Memory:
+T           ID          KEY MODE        OWNER    GROUP
+m        65536   1314148402 --rw-rw-rw- ntpd     ntpd
+
+
+Start usbdcf77re with the correspondig SHM:
+
+command: "usbdcf77re -d 65536"
+
+After the device is in sync check the status of ntpd:
+
+
+command: "ntpq -pn"
+
+Output:
+
+     remote           refid      st t when poll reach   delay   offset  jitter
+==============================================================================
+ 0.freebsd.pool. .POOL.          16 p    -   64    0    0.000   +0.000   0.000
+ 2.freebsd.pool. .POOL.          16 p    -   64    0    0.000   +0.000   0.000
+*127.127.28.2    .SHM.            0 l  224  256  377    0.000   -7.411   5.645
+-213.239.234.28  193.158.22.13    2 u  203  256  377    6.609   +2.816   1.929
+
+

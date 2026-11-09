@@ -10,6 +10,6 @@ Extract the archive. (e. g. usbdcf77re-0.1.2.tar.gz)
 
 Go to directory "src" and type: "make"
 
-the binary file usbdcf77re will be created.
+The binary file usbdcf77re will be created.
 
 

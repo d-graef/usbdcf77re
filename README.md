@@ -5,7 +5,7 @@ https://www.reusch-elektronik.de/re/en/products/usbdcf77/index.htm
 
 and writes the time to a shared memory segment for chrony, ntpd or ntpsec.
 
-Currently it was tested on Fedora Linux 44 and chrony.
+Currently it was tested on Fedora Linux 44 and chrony, and FreeBSD 15.1 amd64 and ntpd Ver. 4.2.8p18-a.
 
 The libusb https://libusb.info/ library is used to query the device.
 
